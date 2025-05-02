@@ -1,0 +1,1069 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Equipamentos e Materiais de Impressão - Single Long Page PDF</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #2d3748;
+            line-height: 1.7;
+            background-color: #f7fafc;
+            scroll-behavior: smooth;
+        }
+        .catalog-container {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 5mm;
+            background-color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .section-title {
+            padding-top: 10mm;
+            margin-bottom: 5mm;
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: #1a202c;
+            border-bottom: 2px solid #3182ce;
+            padding-bottom: 3mm;
+            display: flex;
+            align-items: center;
+        }
+        .category-header {
+            background: linear-gradient(90deg, #2b6cb0 0%, #2c5282 100%);
+            color: white;
+            padding: 3mm 5mm;
+            border-radius: 3mm;
+            margin-top: 10mm;
+            margin-bottom: 5mm;
+            font-size: 1.25rem;
+            font-weight: 700;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .category-header img {
+            width: 12mm;
+            height: auto;
+        }
+        .product-card {
+            border: 1px solid #edf2f7;
+            border-radius: 3mm;
+            overflow: hidden;
+            margin-bottom: 5mm;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+        .product-card:hover {
+            transform: translateY(-2mm);
+            box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .product-card-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 768px) {
+            .product-card-grid {
+                grid-template-columns: 1fr 2fr;
+                gap: 3mm;
+                align-items: stretch;
+            }
+        }
+        .product-image-container {
+            padding: 3mm;
+            background-color: #f7fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid #edf2f7;
+            min-height: 60mm;
+            position: relative;
+            overflow: hidden;
+        }
+        @media (min-width: 768px) {
+            .product-image-container {
+                border-bottom: none;
+                border-right: 1px solid #edf2f7;
+            }
+        }
+        .product-image {
+            max-width: 100%;
+            height: auto;
+            max-height: 50mm;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+        }
+        .product-image:hover {
+            transform: scale(1.05);
+        }
+        .product-content {
+            padding: 3mm;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .price-tag {
+            background-color: #38a169;
+            color: white;
+            padding: 1mm 2mm;
+            border-radius: 5mm;
+            font-weight: 600;
+            margin-top: 3mm;
+            font-size: 0.8rem;
+        }
+        .buying-tips {
+            background-color: #ebf8ff;
+            border-left: 2px solid #4299e1;
+            padding: 2mm;
+            margin-top: 3mm;
+            border-radius: 0 2mm 2mm 0;
+            font-size: 0.8rem;
+        }
+        .footer {
+            margin-top: 10mm;
+            padding-top: 5mm;
+            border-top: 1px solid #edf2f7;
+            text-align: center;
+            color: #718096;
+            font-size: 0.8rem;
+        }
+        .footer img {
+            max-width: 40mm;
+            height: auto;
+            margin-bottom: 2mm;
+        }
+        .download-button {
+            background: linear-gradient(90deg, #2b6cb0 0%, #2c5282 100%);
+            color: white;
+            padding: 3mm 5mm;
+            border-radius: 3mm;
+            font-size: 1rem;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin: 5mm auto;
+            display: block;
+            text-align: center;
+            width: fit-content;
+        }
+        .download-button:hover {
+            transform: scale(1.05);
+        }
+        .download-button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+        /* Print styles for single long page */
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            .catalog-container {
+                margin: 0;
+                padding: 5mm;
+                box-shadow: none;
+                width: 210mm;
+            }
+            .product-image {
+                max-height: 40mm;
+            }
+            .product-card, .comparison-table, .glossary-term {
+                page-break-inside: avoid;
+            }
+            .category-header, .section-title {
+                page-break-before: auto;
+            }
+            .download-button {
+                display: none; /* Hide button in PDF */
+            }
+        }
+    </style>
+</head>
+<body>
+    <button id="downloadButton" class="download-button" onclick="generatePDF()" disabled><i class="fas fa-download mr-2"></i> Descarregar PDF</button>
+
+    <div class="catalog-container">
+        <div class="flag-colors">
+            <div class="flag-red" style="background-color: #c53030; flex: 1; height: 2mm;"></div>
+            <div class="flag-black" style="background-color: #1a202c; flex: 1; height: 2mm;"></div>
+        </div>
+
+        <header class="text-center mb-12">
+            <img src="https://grupoysam.com/wp-content/uploads/2025/05/Angbu-Comercio-Logo.png" alt="Angbu Comércio Logo" class="mx-auto mb-4" width="150" height="50">
+            <h1 class="text-4xl font-extrabold text-blue-900 mb-3">Catálogo de Equipamentos de Impressão</h1>
+            <p class="text-xl text-gray-600">Um guia simples para comprar equipamentos e materiais de impressão e bordado</p>
+        </header>
+
+        <section id="introduction" class="pt-4">
+            <h2 class="section-title"><i class="fas fa-book-open"></i> Introdução ao Catálogo</h2>
+            <div class="bg-blue-50 p-6 rounded-lg mb-8 shadow-sm">
+                <h3 class="text-xl font-semibold text-blue-800 mb-3"><i class="fas fa-info-circle"></i> Como usar este catálogo</h3>
+                <p class="mb-4 text-sm">Este catálogo foi criado para ajudar pessoas sem conhecimentos técnicos a comprar equipamentos e materiais para um negócio de impressão e bordado. Todos os equipamentos estão organizados por categoria e incluem:</p>
+                <ul class="styled-list mb-4 text-sm">
+                    <li>Descrição simples do que faz cada equipamento</li>
+                    <li>Especificações básicas que deve considerar</li>
+                    <li>Faixa de preço aproximada (em Kwanzas Angolanos - AOA)</li>
+                    <li>Dicas de compra para ajudar na sua decisão</li>
+                </ul>
+                <p class="text-sm">Cada item está marcado como <span class="essential-tag">Essencial</span>, <span class="recommended-tag">Recomendado</span> ou <span class="optional-tag">Opcional</span> para ajudar na priorização das compras.</p>
+            </div>
+        </section>
+
+        <section id="getting-started" class="pt-4">
+            <h2 class="section-title"><i class="fas fa-rocket"></i> Como Começar</h2>
+            <div class="bg-yellow-50 p-6 rounded-lg mb-8 shadow-sm">
+                <h3 class="text-xl font-semibold text-yellow-800 mb-3"><i class="fas fa-lightbulb"></i> Antes de comprar qualquer equipamento</h3>
+                <p class="mb-4 text-sm">Siga estes passos para garantir que compra o equipamento certo para as suas necessidades:</p>
+                <ol class="styled-list-decimal text-sm">
+                    <li>Defina claramente quais serviços vai oferecer (impressão digital, bordado, grandes formatos, etc.)</li>
+                    <li>Estabeleça um orçamento total para equipamentos, lembrando-se de incluir custos de consumíveis iniciais</li>
+                    <li>Considere o espaço disponível para instalar os equipamentos</li>
+                    <li>Pesquise fornecedores confiáveis em Angola ou importadores especializados</li>
+                    <li>Verifique opções de manutenção local para os equipamentos mais importantes</li>
+                    <li>Compare as especificações dos equipamentos com os serviços que planeia oferecer</li>
+                </ol>
+                <div class="mt-6 p-4 bg-white rounded-lg border border-yellow-200 shadow-inner">
+                    <h4 class="font-semibold text-yellow-800 mb-2 text-sm"><i class="fas fa-sort-amount-down"></i> Ordem de compra recomendada (conforme orçamento):</h4>
+                    <ol class="styled-list-decimal text-sm">
+                        <li>Equipamentos essenciais primeiro (impressora digital, computadores, software básico)</li>
+                        <li>Equipamentos de acabamento básicos (guilhotina, plastificadora)</li>
+                        <li>Equipamentos de personalização (prensas térmicas, sistema de transfer)</li>
+                        <li>Máquina de bordar</li>
+                        <li>Software especializado de digitalização de bordados</li>
+                        <li>Equipamentos de grande formato</li>
+                        <li>Equipamentos opcionais e especializados</li>
+                    </ol>
+                </div>
+            </div>
+            <div class="mt-8">
+                <h3 class="text-xl font-semibold mb-3"><i class="fas fa-coins"></i> Orçamento Inicial Aproximado</h3>
+                <div class="overflow-x-auto shadow-sm rounded-lg">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Nível de Investimento</th>
+                                <th>Orçamento Aproximado (AOA)</th>
+                                <th>O que inclui (Exemplos)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Básico</strong></td>
+                                <td>25.000.000 - 40.000.000</td>
+                                <td>Impressora digital básica, computadores, software essencial, alguns equipamentos de acabamento</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Intermediário</strong></td>
+                                <td>40.000.000 - 75.000.000</td>
+                                <td>Melhor impressora digital, equipamento de grande formato básico, personalização de vestuário, acabamento completo</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Completo</strong></td>
+                                <td>75.000.000 - 120.000.000+</td>
+                                <td>Equipamento profissional completo incluindo máquina de bordar computorizada, impressora digital avançada, plotter grande formato de qualidade</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Nota: Estes valores são estimativas e podem variar significativamente com base na marca, modelo, fornecedor e custos de importação.</p>
+            </div>
+        </section>
+
+        <section id="printing-equipment" class="pt-4">
+            <h2 class="category-header"><i class="fas fa-print"></i> Equipamentos de Impressão <img src="https://grupoysam.com/wp-content/uploads/2025/05/Angbu-Comercio-Logo.png" alt="Angbu Comércio Logo"></h2>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://primeprinters.com.br/arquivos/produtos/imagens_adicionais/FOTO_dadb9abfdbacfac7f31c2e44059c7675.jpg" alt="Impressora Digital a Cores Profissional" class="product-image" width="480" height="320">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Impressora Digital a Cores Profissional <span class="essential-tag">Essencial</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Este é o equipamento central do seu negócio. Permite imprimir folhetos, brochuras, cartões de visita e outros materiais em papel com alta qualidade.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Velocidade: mínimo de 30-50 páginas por minuto (ppm)</li>
+                                <li>Qualidade: resolução de <span class="tooltip" data-tooltip="Pontos por polegada, mede a nitidez da impressão">1200 x 1200 dpi</span> ou superior</li>
+                                <li>Tamanho máximo: capacidade para imprimir até A3 ou <span class="tooltip" data-tooltip="Formato maior que A3 para margens de corte">SRA3</span></li>
+                                <li>Gramagem: capacidade para papel até 300gsm (papel grosso)</li>
+                                <li>Alimentador automático de documentos (ADF)</li>
+                                <li>Conectividade: USB, Ethernet (Rede) e Wi-Fi</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Marcas recomendadas: Xerox, Konica Minolta, Ricoh, Canon</li>
+                                <li>Considere o custo dos consumíveis (toner, tambor)</li>
+                                <li>Verifique se existe suporte técnico local</li>
+                                <li>Considere um contrato de manutenção</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">9.000.000 - 27.000.000 AOA+</div>
+                    </div>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://www.mimakiusa.com/wp-content/uploads/2020/11/MicrosoftTeams-image-71-720x509.png" alt="Plotter de Grande Formato" class="product-image" width="510" height="340">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Plotter de Grande Formato <span class="recommended-tag">Recomendado</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Permite imprimir materiais de grande formato como pendões (banners), lonas, autocolantes em vinil e cartazes de alta qualidade.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Largura de impressão: 1.37m ou 1.60m (comum)</li>
+                                <li>Tipo de tinta: eco-solvente ou látex</li>
+                                <li>Resolução: <span class="tooltip" data-tooltip="Pontos por polegada, mede a nitidez da impressão">1440 dpi</span> ou superior</li>
+                                <li>Velocidade: avaliar m²/hora</li>
+                                <li><span class="tooltip" data-tooltip="Software que converte ficheiros para impressão">Software RIP</span> incluído</li>
+                                <li>Função de recorte integrada (opcional)</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Marcas recomendadas: Roland, Mimaki, HP (Látex), Epson</li>
+                                <li>Verifique o custo das tintas</li>
+                                <li>Considere o espaço necessário e ventilação</li>
+                                <li>Verifique requisitos elétricos</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">7.000.000 - 25.000.000 AOA+</div>
+                    </div>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://m.media-amazon.com/images/I/61mB4vxwAHL.jpg" alt="Prensa Térmica Plana" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Prensa Térmica Plana <span class="recommended-tag">Recomendado</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Usada para transferir designs para t-shirts, e outros materiais têxteis e planos (ex: azulejos, placas de metal). Essencial para personalização.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Tamanho: base de 40x50cm (versátil)</li>
+                                <li>Controlo digital de temperatura e tempo</li>
+                                <li>Pressão ajustável e uniforme</li>
+                                <li>Abertura automática/semi-automática (opcional)</li>
+                                <li>Distribuição uniforme de calor</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Prefira modelos com estrutura robusta</li>
+                                <li>Verifique a precisão da temperatura</li>
+                                <li>Escolha modelos com garantia</li>
+                                <li>Uma prensa de qualidade vale o investimento</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">200.000 - 900.000 AOA</div>
+                    </div>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://www.teknova.com.br/img/products/impressora-dtf-60cm-prime-dtf-60x-i3200-direct-to-film_1_1200.jpg" alt="Sistema de Impressão Transfer (DTF)" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Sistema de Impressão para Transfer <span class="recommended-tag">Recomendado</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Usado com a prensa térmica para criar transfers aplicados em t-shirts e outros produtos. Várias tecnologias disponíveis.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">Opções principais:</h4>
+                            <ul class="styled-list text-sm">
+                                <li><strong><span class="tooltip" data-tooltip="Impressão em filme especial transferido para tecido">DTF (Direct to Film):</span></strong> Versátil, funciona em quase todos os tecidos</li>
+                                <li><strong><span class="tooltip" data-tooltip="Tinta vira gás e tinge poliéster">Sublimação:</span></strong> Cores vibrantes, mas só em poliéster/revestidos</li>
+                                <li><strong>Vinil de Recorte + Plotter:</strong> Para designs vetoriais/textos</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>DTF é indicado para iniciar pela versatilidade</li>
+                                <li>Sistemas DTF incluem: impressora, tintas, filme, pó, forno/agitador</li>
+                                <li>Verifique o custo dos consumíveis</li>
+                                <li>Para sublimação, considere impressora Epson convertida</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">900.000 - 5.000.000 AOA+</div>
+                    </div>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://m.media-amazon.com/images/I/61qeQ2Gor5L._AC_UF894,1000_QL80_.jpg" alt="Prensa Térmica para Canecas" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Prensa Térmica para Canecas <span class="optional-tag">Opcional</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Usada para transferir designs (geralmente sublimação) para canecas revestidas. Complemento para brindes personalizados.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Controlo digital de temperatura e tempo</li>
+                                <li>Resistência (manta) de qualidade</li>
+                                <li>Compatibilidade com tamanhos de canecas padrão</li>
+                                <li>Fácil substituição da resistência</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Considere adquirir após estabelecer serviços principais</li>
+                                <li>Compre junto com canecas para sublimação</li>
+                                <li>Prensas "combo" incluem acessório para canecas</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">100.000 - 400.000 AOA</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-6 rounded-lg mt-8 shadow-sm">
+                <h3 class="text-xl font-semibold mb-3"><i class="fas fa-balance-scale"></i> Comparação de Sistemas de Impressão para Vestuário</h3>
+                <div class="overflow-x-auto">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Sistema</th>
+                                <th>Vantagens</th>
+                                <th>Desvantagens</th>
+                                <th>Melhor para</th>
+                                <th>Preço Aprox. (Sistema)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong><span class="tooltip" data-tooltip="Impressão em filme especial transferido para tecido">DTF (Direct to Film)</span></strong></td>
+                                <td>Funciona em qualquer tecido/cor, cores vibrantes, boa durabilidade, toque suave</td>
+                                <td>Investimento inicial moderado, processo multi-etapas (imprimir, polvilhar, curar, prensar)</td>
+                                <td>Negócios que querem versatilidade máxima (algodão, poliéster, mistos, escuros, claros)</td>
+                                <td>2.500.000+ AOA</td>
+                            </tr>
+                            <tr>
+                                <td><strong><span class="tooltip" data-tooltip="Tinta vira gás e tinge poliéster">Sublimação</span></strong></td>
+                                <td>Cores extremamente vivas, toque zero (tinta integra-se à fibra), durabilidade excelente</td>
+                                <td>Funciona apenas em poliéster (mín. 60%) ou materiais revestidos, idealmente em fundos claros</td>
+                                <td>T-shirts desportivas, canecas, brindes revestidos, bandeiras</td>
+                                <td>900.000+ AOA</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Vinil de Recorte (Transfer)</strong></td>
+                                <td>Baixo investimento inicial (plotter + prensa), fácil de usar para designs simples</td>
+                                <td>Apenas cores sólidas (limitado para fotos/gradientes), design limitado, processo mais lento para detalhes, toque mais "emborrachado"</td>
+                                <td>Pequenos volumes, nomes/números para uniformes, logos simples</td>
+                                <td>250.000+ AOA (Plotter)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>DTG (Direct to Garment)</strong></td>
+                                <td>Impressão direta na peça, ideal para fotos/designs complexos, toque suave (especialmente em tecidos claros)</td>
+                                <td>Alto investimento inicial, requer pré-tratamento para tecidos escuros, manutenção rigorosa</td>
+                                <td>Produção sob demanda de alta qualidade, lojas online</td>
+                                <td>10.000.000+ AOA</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="embroidery-equipment" class="pt-4">
+            <h2 class="category-header"><i class="fas fa-crosshairs"></i> Equipamentos de Bordado <img src="https://grupoysam.com/wp-content/uploads/2025/05/Angbu-Comercio-Logo.png" alt="Angbu Comércio Logo"></h2>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://m.media-amazon.com/images/I/61RL-445lWL._AC_UF894,1000_QL80_.jpg" alt="Máquina de Bordar Computorizada" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Máquina de Bordar Computorizada <span class="recommended-tag">Recomendado</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Permite bordar logos, textos e designs em roupas e tecidos. Oferece um acabamento profissional valorizado em uniformes.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Nº de cabeças: 1 cabeça para iniciar</li>
+                                <li>Nº de agulhas/cores: mínimo 6, ideal 10-15</li>
+                                <li>Área de bordado: mínimo 30x20cm</li>
+                                <li>Velocidade: 600-1000 pontos por minuto</li>
+                                <li>Conexão USB ou rede</li>
+                                <li>Corte de linha automático</li>
+                                <li>Acessórios incluídos (bastidores, kit bonés opcional)</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Marcas: Brother (PR), Ricoma, Tajima, Melco, Barudan</li>
+                                <li>Considere máquina nova (confiabilidade)</li>
+                                <li>Verifique peças e suporte técnico local</li>
+                                <li>Investimento significativo, mas diferenciador</li>
+                                <li>Inclua formação básica na compra</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">5.000.000 - 20.000.000+ AOA</div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8 bg-purple-50 p-6 rounded-lg shadow-sm">
+                <h3 class="text-xl font-semibold mb-3 text-purple-800"><i class="fas fa-info-circle"></i> O que precisa saber sobre bordado computorizado</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-purple-800 text-sm">Componentes essenciais:</h4>
+                        <ul class="checklist mt-2 text-sm">
+                            <li>Máquina de bordar computorizada</li>
+                            <li>Software de digitalização (picagem)</li>
+                            <li>Bastidores de vários tamanhos</li>
+                            <li><span class="tooltip" data-tooltip="Material de suporte para bordado">Entretelas (estabilizadores)</span></li>
+                            <li>Linhas de bordar (cores variadas)</li>
+                            <li>Agulhas específicas</li>
+                            <li>Computador dedicado</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-purple-800 text-sm">Considerações importantes:</h4>
+                        <ul class="styled-list mt-2 space-y-1 text-sm">
+                            <li><strong>Aprendizagem:</strong> Requer formação específica (máquina e software).</li>
+                            <li><strong>Espaço:</strong> Precisa de área dedicada e estável.</li>
+                            <li><strong>Manutenção:</strong> Limpeza, lubrificação e verificações regulares.</li>
+                            <li><strong>Consumíveis:</strong> Stock de linhas, entretelas e agulhas.</li>
+                            <li><strong>Software:</strong> Investimento crucial para a qualidade.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="product-card mt-6">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://latinamerica.brother.com/-/media/brother/product-catalog-media/images/2019/01/24/17/17/pedesign11_right.png" alt="Software de Digitalização de Bordados" class="product-image" width="600" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Software de Digitalização de Bordados <span class="essential-tag">Essencial</span><br><small class="text-xs font-normal">(se tiver máquina de bordar)</small></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Converte logos e designs em ficheiros de bordado que a máquina lê (processo de <span class="tooltip" data-tooltip="Conversão de design em pontos para bordado">"picagem"</span> ou "digitalização"). A qualidade da picagem afeta o resultado final.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Compatibilidade com a sua máquina (formato .DST, .PES, etc.)</li>
+                                <li>Interface intuitiva</li>
+                                <li>Ferramentas de edição de pontos (densidade, compensação)</li>
+                                <li>Importação de formatos comuns (JPG, PNG, AI, PDF, SVG)</li>
+                                <li>Controlo sobre base (underlay), tipo de ponto, sequência</li>
+                                <li>Suporte técnico e tutoriais</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Opções: Wilcom, Hatch, Embrilliance, PE-Design (Brother).</li>
+                                <li>Verifique se a marca da máquina oferece software próprio.</li>
+                                <li>Considere iniciar com versão básica/intermédia.</li>
+                                <li>Qualidade do software e habilidade do digitalizador são cruciais.</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">500.000 - 4.000.000+ AOA</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="finishing-equipment" class="pt-4">
+            <h2 class="category-header"><i class="fas fa-cut"></i> Equipamentos de Acabamento <img src="https://grupoysam.com/wp-content/uploads/2025/05/Angbu-Comercio-Logo.png" alt="Angbu Comércio Logo"></h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="product-card flex flex-col">
+                    <div class="product-image-container">
+                        <img src="https://www.jdmprodutosgraficos.com.br/produtos-graficos/imagens/guilhotina-de-papel-valor.jpg" alt="Guilhotina" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Guilhotina <span class="essential-tag">Essencial</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Corta pilhas de papel com precisão, criando margens perfeitas para cartões, folhetos, etc.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Largura de corte: mínimo A3 (430mm+)</li>
+                                <li>Capacidade de corte (altura da pilha)</li>
+                                <li>Sistema de segurança</li>
+                                <li>Prensa de papel</li>
+                                <li>Tipo: manual (alavanca) ou elétrica</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 bg-gray-50">
+                        <div class="price-tag">100.000 - 1.500.000 AOA+</div>
+                    </div>
+                </div>
+                <div class="product-card flex flex-col">
+                    <div class="product-image-container">
+                        <img src="https://images.tcdn.com.br/img/img_prod/196157/maquina_de_vincar_profissional_de_55cm_completa_visutec_3615_1_20240903133921.jpg" alt="Máquina de Vincar" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Máquina de Vincar <span class="recommended-tag">Recomendado</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Cria dobras limpas em papel grosso (evita quebrar a fibra), essencial para pastas, cartões dobrados, etc.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Compatibilidade com gramagens até 350gsm+</li>
+                                <li>Largura de trabalho: mínimo A4/A3</li>
+                                <li>Ajuste para largura do vinco</li>
+                                <li>Facilidade de operação</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 bg-gray-50">
+                        <div class="price-tag">50.000 - 500.000 AOA</div>
+                    </div>
+                </div>
+                <div class="product-card flex flex-col">
+                    <div class="product-image-container">
+                        <img src="https://acdn-us.mitiendanube.com/stores/001/893/480/products/f54a5baca26043798cce1479f0a9fde72fproduct2fimages2f86152532f0b19f07a4d55443098fd04a37243bfb6-a09813ae9810742d0d17431136159189-1024-1024.jpeg" alt="Encadernadora" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Encadernadora <span class="recommended-tag">Recomendado</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Permite encadernar documentos (apostilas, relatórios) perfurando e aplicando espirais, argolas (wire-o) ou capas térmicas.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Tipo: espiral, argolas (wire-o), térmica</li>
+                                <li>Capacidade de perfuração</li>
+                                <li>Capacidade de encadernação</li>
+                                <li>Tamanho máximo: A4 (padrão)</li>
+                                <li>Operação: manual ou elétrica</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 bg-gray-50">
+                        <div class="price-tag">50.000 - 1.000.000 AOA+</div>
+                    </div>
+                </div>
+                <div class="product-card flex flex-col">
+                    <div class="product-image-container">
+                        <img src="https://m.media-amazon.com/images/I/512WeJgX-JL._AC_UF894,1000_QL80_.jpg" alt="Plastificadora" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Plastificadora <span class="recommended-tag">Recomendado</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Aplica filme plástico (bolsas/pouches) aos impressos usando calor, protegendo-os e dando acabamento.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Largura: A3+ (versátil)</li>
+                                <li>Tipo: a quente (plastificação por bolsas)</li>
+                                <li>Velocidade de plastificação</li>
+                                <li>Ajuste de temperatura (microns)</li>
+                                <li>Sistema anti-encravamento (reverse)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 bg-gray-50">
+                        <div class="price-tag">40.000 - 300.000 AOA</div>
+                    </div>
+                </div>
+                <div class="product-card flex flex-col">
+                    <div class="product-image-container">
+                        <img src="https://grupoysam.com/wp-content/uploads/2025/05/Plotter-de-Recorte.png" alt="Plotter de Recorte" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Plotter de Recorte <span class="optional-tag">Opcional</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Recorta vinil autocolante ou transfer com precisão para autocolantes, letras, designs para vitrines, carros, t-shirts.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>Largura de corte: 60cm (bom início)</li>
+                                <li>Precisão de corte</li>
+                                <li>Força de corte ajustável</li>
+                                <li>Leitor ótico (recorte de contorno)</li>
+                                <li>Software incluído</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 bg-gray-50">
+                        <div class="price-tag">250.000 - 1.000.000 AOA</div>
+                    </div>
+                </div>
+                <div class="product-card flex flex-col">
+                    <div class="product-image-container">
+                        <img src="https://grupoysam.com/wp-content/uploads/2025/05/Ferramentas-Manuais.png" alt="Ferramentas Manuais" class="product-image" width="400" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Ferramentas Manuais <span class="essential-tag">Essencial</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Conjunto de ferramentas básicas para acabamento, montagem e preparação de materiais.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que incluir:</h4>
+                            <ul class="styled-list text-sm">
+                                <li>X-atos (estiletes) de precisão e lâminas</li>
+                                <li>Réguas metálicas (30cm, 50cm, 100cm)</li>
+                                <li>Bases de corte auto-regenerativas</li>
+                                <li>Tesouras de precisão</li>
+                                <li>Aplicador de ilhós (manual) e ilhós</li>
+                                <li>Furadores de papel</li>
+                                <li>Espátulas para aplicação de vinil</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t border-gray-100 bg-gray-50">
+                        <div class="price-tag">50.000 - 150.000 AOA (Conjunto)</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="computer-software" class="pt-4">
+            <h2 class="category-header"><i class="fas fa-laptop-code"></i> Computadores e Software <img src="https://grupoysam.com/wp-content/uploads/2025/05/Angbu-Comercio-Logo.png" alt="Angbu Comércio Logo"></h2>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://grupoysam.com/wp-content/uploads/2025/05/29f04b5a-28af-4dfa-9551-b758d16c2307.png" alt="Computador para Design Gráfico" class="product-image" width="600" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Computadores para Design <span class="essential-tag">Essencial</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Computadores potentes para executar programas de design gráfico, <span class="tooltip" data-tooltip="Software para impressão de grande formato">software RIP</span>, digitalização de bordados e gestão.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar (Recomendado):</h4>
+                            <ul class="styled-list text-sm">
+                                <li>SO: Windows ou macOS</li>
+                                <li>Processador: Intel Core i7/i9, AMD Ryzen 7/9, Apple M-series</li>
+                                <li>RAM: mínimo 16GB (ideal 32GB+)</li>
+                                <li>Armazenamento: SSD NVMe 1TB+</li>
+                                <li>Placa Gráfica: Dedicada (NVIDIA/AMD) 6GB+ VRAM ou Apple M</li>
+                                <li>Monitor: 27"+, IPS, boa calibração de cores</li>
+                                <li>Conectividade: USB-C/Thunderbolt, USB-A, Rede</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Planeie 2-3 computadores (design, produção, admin).</li>
+                                <li>Invista mais no computador de design.</li>
+                                <li>Considere backups e UPS (NoBreak).</li>
+                                <li>Verifique compatibilidade com software/hardware.</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">700.000 - 2.500.000+ AOA (por unidade)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://as1.ftcdn.net/jpg/04/46/68/72/1000_F_446687203_Pz9SLUXK55YhuWo5okjSyVEEiWqT50AF.jpg" alt="Software de Design Gráfico" class="product-image" width="600" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Software de Design Gráfico <span class="essential-tag">Essencial</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Programas para criar/editar designs vetoriais, imagens, diagramar layouts e preparar ficheiros para impressão.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">Opções principais:</h4>
+                            <ul class="styled-list text-sm">
+                                <li><strong>Adobe Creative Cloud:</strong> Padrão (Photoshop, Illustrator, InDesign). Assinatura.</li>
+                                <li><strong>CorelDRAW Graphics Suite:</strong> Popular em gráficas. Licença ou Assinatura.</li>
+                                <li><strong>Affinity Suite:</strong> Alternativa económica. Licença única.</li>
+                                <li><strong><span class="tooltip" data-tooltip="Software para impressão de grande formato">Software RIP:</span></strong> Específico para plotters (incluído ou recomendado).</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Escolha com base na experiência da equipa.</li>
+                                <li>Considere formação se necessário.</li>
+                                <li>Adquira licenças legítimas.</li>
+                                <li>Verifique compatibilidade.</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">400.000 - 900.000 AOA (Licença/Anuidade)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="product-card">
+                <div class="product-card-grid">
+                    <div class="product-image-container">
+                        <img src="https://www.logic-print.com/Software-Gerenciamento-Industria-Impressao/PresupuestoRevista.PNG" alt="Software de Gestão e Faturação" class="product-image" width="600" height="400">
+                    </div>
+                    <div class="product-content">
+                        <h3 class="text-lg font-bold">Software de Gestão e Faturação <span class="essential-tag">Essencial</span></h3>
+                        <p class="text-gray-600 mt-2 text-sm">Programas para administrar o negócio, criar orçamentos, emitir faturas certificadas pela AGT, gerir clientes e controlar stocks.</p>
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-xs uppercase tracking-wide">O que procurar:</h4>
+                            <ul class="styled-list text-sm">
+                                <li><strong>Certificação da AGT:</strong> Obrigatório em Angola.</li>
+                                <li>Módulo de orçamentação</li>
+                                <li>Gestão de clientes (CRM)</li>
+                                <li>Controlo de stocks</li>
+                                <li>Emissão de documentos fiscais</li>
+                                <li>Relatórios financeiros</li>
+                                <li>Suporte local ou em português</li>
+                            </ul>
+                        </div>
+                        <div class="buying-tips">
+                            <h4 class="font-semibold"><i class="fas fa-shopping-cart"></i> Dicas de compra:</h4>
+                            <ul class="mt-1 space-y-1 text-sm">
+                                <li>Busque software com provas dadas em Angola (Primavera, PHC, Sage, etc.).</li>
+                                <li>Verifique estrutura de custos (licença + suporte/atualizações).</li>
+                                <li>Considere facilidade de uso.</li>
+                                <li>Escolha soluções com formação e suporte.</li>
+                            </ul>
+                        </div>
+                        <div class="price-tag">100.000 - 500.000 AOA (+ mensalidade/anuidade)</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="consumables" class="pt-4">
+            <h2 class="category-header"><i class="fas fa-tint"></i> Consumíveis Essenciais <img src="https://grupoysam.com/wp-content/uploads/2025/05/Angbu-Comercio-Logo.png" alt="Angbu Comércio Logo"></h2>
+            <div class="bg-green-50 p-6 rounded-lg mb-6 shadow-sm">
+                <h3 class="text-xl font-semibold text-green-800 mb-3"><i class="fas fa-boxes"></i> Planeamento de Consumíveis Iniciais</h3>
+                <p class="mb-4 text-sm">Reserve aproximadamente <strong>10-15% do seu orçamento inicial de equipamentos</strong> para a compra de consumíveis. Isso garantirá que pode começar a operar imediatamente, fazer testes e atender aos primeiros pedidos sem demora.</p>
+                <p class="text-xs text-green-700">Ter um bom stock inicial evita paragens na produção por falta de material.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="product-card bg-white">
+                    <div class="p-4">
+                        <h3 class="text-lg font-bold mb-3 border-b pb-2"><i class="fas fa-file-alt mr-2 text-blue-600"></i> Impressão Digital</h3>
+                        <ul class="styled-list text-sm">
+                            <li><strong>Papel:</strong> Resmas (90g, 120g, 180g, 250g, 300g)</li>
+                            <li><strong>Tamanhos:</strong> A4, A3, <span class="tooltip" data-tooltip="Formato maior que A3 para margens de corte">SRA3</span></li>
+                            <li><strong>Tipos:</strong> Couchê brilho/fosco, offset, cartão, autocolante</li>
+                            <li><strong>Toner/Cartuchos:</strong> Conjunto <span class="tooltip" data-tooltip="Ciano, Magenta, Amarelo, Preto">CMYK</span> + 1 extra de cada + Preto extra</li>
+                            <li><strong>Unidades de Imagem/Tambor:</strong> Reserva</li>
+                            <li><strong>Itens de manutenção:</strong> Kit manutenção, rolos, fusor</li>
+                            <li class="mt-2 font-semibold">Estimativa inicial: 1.500.000 - 3.000.000 AOA</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="product-card bg-white">
+                    <div class="p-4">
+                        <h3 class="text-lg font-bold mb-3 border-b pb-2"><i class="fas fa-expand-arrows-alt mr-2 text-blue-600"></i> Grande Formato</h3>
+                        <ul class="styled-list text-sm">
+                            <li><strong>Vinil autocolante:</strong> Rolos branco brilho/fosco, transparente</li>
+                            <li><strong>Lona para pendão:</strong> Rolo (ex: 440gsm)</li>
+                            <li><strong>Papel Fotográfico/Outdoor:</strong> Rolo (se aplicável)</li>
+                            <li><strong>Tintas:</strong> Conjunto completo + extras</li>
+                            <li><strong>Líquido de Limpeza:</strong> Específico</li>
+                            <li><strong>Acessórios:</strong> Ilhós, fita dupla-face, fita de transferência</li>
+                            <li class="mt-2 font-semibold">Estimativa inicial: 1.000.000 - 2.500.000 AOA</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="product-card bg-white">
+                    <div class="p-4">
+                        <h3 class="text-lg font-bold mb-3 border-b pb-2"><i class="fas fa-tshirt mr-2 text-blue-600"></i> Personalização de Vestuário</h3>
+                        <ul class="styled-list text-sm">
+                            <li><strong>T-shirts:</strong> Brancas/cores (algodão/poliéster), tamanhos variados</li>
+                            <li><strong>Polos:</strong> Cores básicas</li>
+                            <li><strong>Bonés:</strong> Modelos adequados</li>
+                            <li><strong>Filme DTF:</strong> Rolo ou folhas</li>
+                            <li><strong>Pó Adesivo DTF:</strong> Branco/preto</li>
+                            <li><strong>Tintas DTF/Sublimação:</strong> <span class="tooltip" data-tooltip="Ciano, Magenta, Amarelo, Preto">CMYK</span> + Branco (DTF) / CMYK (Subli)</li>
+                            <li><strong>Papel Sublimático:</strong> Resma ou rolo</li>
+                            <li><strong>Vinil Transfer Têxtil:</strong> Rolos cores básicas</li>
+                            <li><strong>Papel Vegetal/Teflon:</strong> Proteção na prensa</li>
+                            <li class="mt-2 font-semibold">Estimativa inicial: 1.000.000 - 2.000.000 AOA</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="product-card bg-white">
+                    <div class="p-4">
+                        <h3 class="text-lg font-bold mb-3 border-b pb-2"><i class="fas fa-crosshairs mr-2 text-blue-600"></i> Bordado</h3>
+                        <ul class="styled-list text-sm">
+                            <li><strong>Linhas de bordar:</strong> Cones cores básicas + frequentes</li>
+                            <li><strong>Linha de Bobina:</strong> Cones branco/preto</li>
+                            <li><strong><span class="tooltip" data-tooltip="Material de suporte para bordado">Entretela/Estabilizador:</span></strong> Rolos (rasgável, cortável, hidrossolúvel)</li>
+                            <li><strong>Agulhas:</strong> Caixas tamanhos variados (75/11, 80/12)</li>
+                            <li><strong>Spray Adesivo Temporário</strong></li>
+                            <li><strong>Óleo para máquina</strong></li>
+                            <li><strong>Tesourinhas de Arremate</strong></li>
+                            <li class="mt-2 font-semibold">Estimativa inicial: 500.000 - 1.500.000 AOA</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-blue-50 p-6 rounded-lg mt-8 shadow-sm">
+                <h3 class="text-xl font-semibold text-blue-800 mb-3"><i class="fas fa-clipboard-list"></i> Dicas para Gestão de Consumíveis</h3>
+                <ul class="styled-list text-sm">
+                    <li>Estabeleça níveis mínimos de stock para itens essenciais.</li>
+                    <li>Considere o prazo de entrega dos fornecedores (importação).</li>
+                    <li>Avalie a qualidade vs. preço (evitar problemas nas máquinas).</li>
+                    <li>Use o software de gestão para acompanhar consumo e custos.</li>
+                    <li>Para bordado, comece com cores básicas e amplie conforme a procura.</li>
+                    <li>Verifique condições de armazenamento (humidade, temperatura).</li>
+                    <li>Negocie preços com fornecedores para compras em volume.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="glossary" class="pt-4">
+            <h2 class="section-title"><i class="fas fa-book"></i> Glossário de Termos</h2>
+            <p class="mb-4 text-sm text-gray-600">Termos técnicos comuns explicados de maneira simples.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="glossary-term">
+                    <h3 class="text-lg font-bold text-gray-800">CMYK</h3>
+                    <p class="text-sm">Sistema de cores para impressão (Ciano, Magenta, Amarelo, Preto). Usado em impressoras digitais e plotters.</p>
+                </div>
+                <div class="glossary-term">
+                    <h3 class="text-lg font-bold text-gray-800">DPI</h3>
+                    <p class="text-sm">Pontos por polegada (dots per inch). Mede a resolução/qualidade da impressão. Maior DPI = mais nitidez.</p>
+                </div>
+                <div class="glossary-term">
+                    <h3 class="text-lg font-bold text-gray-800">DTF (Direct to Film)</h3>
+                    <p class="text-sm">Técnica de impressão em filme transferido para tecidos com prensa térmica. Versátil para vários materiais.</p>
+                </div>
+                <div class="glossary-term">
+                    <h3 class="text-lg font-bold text-gray-800">Sublimação</h3>
+                    <p class="text-sm">Técnica onde a tinta vira gás e tinge poliéster ou materiais revestidos, ideal para cores vivas.</p>
+                </div>
+                <div class="glossary-term">
+                    <h3 class="text-lg font-bold text-gray-800">Software RIP</h3>
+                    <p class="text-sm">Programa que converte ficheiros (ex: PDF, JPG) para impressão em plotters, controlando cores e corte.</p>
+                </div>
+                <div class="glossary-term">
+                    <h3 class="text-lg font-bold text-gray-800">Picagem/Digitalização</h3>
+                    <p class="text-sm">Processo de converter um design (ex: logo) em pontos para a máquina de bordar executar.</p>
+                </div>
+                <div class="glossary-term">
+                    <h3 class="text-lg font-bold text-gray-800">Entretela/Estabilizador</h3>
+                    <p class="text-sm">Material de suporte colocado sob o tecido no bordado para maior estabilidade e qualidade.</p>
+                </div>
+                <div class="glossary-term">
+                    <h3 class="text-lg font-bold text-gray-800">GSM</h3>
+                    <p class="text-sm">Gramas por metro quadrado. Mede a espessura/peso do papel (ex: 90gsm, 300gsm).</p>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <img src="https://grupoysam.com/wp-content/uploads/2025/05/Angbu-Comercio-Logo.png" alt="Angbu Comércio Logo">
+            <p>© 2025 Angbu Comércio. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Preload all images before enabling the download button
+        function preloadImages() {
+            const images = document.querySelectorAll('img');
+            const imageUrls = Array.from(images).map(img => img.src);
+            let loadedCount = 0;
+
+            return new Promise((resolve, reject) => {
+                if (imageUrls.length === 0) {
+                    resolve();
+                    return;
+                }
+
+                imageUrls.forEach(url => {
+                    const img = new Image();
+                    img.src = url;
+                    img.onload = () => {
+                        loadedCount++;
+                        if (loadedCount === imageUrls.length) {
+                            resolve();
+                        }
+                    };
+                    img.onerror = () => {
+                        console.warn(`Failed to load image: ${url}`);
+                        loadedCount++;
+                        if (loadedCount === imageUrls.length) {
+                            resolve();
+                        }
+                    };
+                });
+
+                // Timeout to prevent hanging if some images fail
+                setTimeout(() => {
+                    resolve();
+                }, 10000); // 10 seconds max
+            });
+        }
+
+        // Enable download button after images are preloaded
+        window.onload = function() {
+            const downloadButton = document.getElementById('downloadButton');
+            downloadButton.textContent = 'Carregando imagens...';
+            preloadImages().then(() => {
+                downloadButton.disabled = false;
+                downloadButton.textContent = 'Descarregar PDF';
+                downloadButton.innerHTML = '<i class="fas fa-download mr-2"></i> Descarregar PDF';
+            }).catch(error => {
+                console.error('Error preloading images:', error);
+                downloadButton.disabled = false;
+                downloadButton.textContent = 'Descarregar PDF (Algumas imagens podem falhar)';
+                downloadButton.innerHTML = '<i class="fas fa-download mr-2"></i> Descarregar PDF (Algumas imagens podem falhar)';
+            });
+        };
+
+        function generatePDF() {
+            const element = document.body;
+            // Estimate content height (in mm) based on scroll height
+            const contentHeight = document.documentElement.scrollHeight * (210 / document.documentElement.clientWidth); // Scale to A4 width
+            const options = {
+                margin: 5,
+                filename: 'Catalogo_Equipamentos_SingleLongPage.pdf',
+                image: { type: 'jpeg', quality: 0.95 },
+                html2canvas: { 
+                    scale: 2,
+                    useCORS: true, // Attempt to handle CORS issues
+                    logging: true, // Enable logging for debugging
+                    timeout: 10000 // Wait up to 10 seconds for rendering
+                },
+                jsPDF: { 
+                    unit: 'mm', 
+                    format: [210, Math.max(297, contentHeight + 10)], 
+                    orientation: 'portrait' 
+                },
+                pagebreak: { mode: 'avoid-all' }
+            };
+            html2pdf().from(element).set(options).save();
+        }
+    </script>
+</body>
+</html>
